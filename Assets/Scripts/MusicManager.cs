@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using DG.Tweening;
+using UnityEngine.Audio;
 
 public class MusicManager : MonoBehaviour {
 	// This is a very basic way of doing music with linear crossfades
@@ -10,14 +11,22 @@ public class MusicManager : MonoBehaviour {
 	// coroutine tweeing library (DoTween or similar) and use easing curves
 
 	public AudioClip[] musicClips;
+	
+	//we're going to create the audio sources at runtime
 	private AudioSource[] musicSources;
+	
+	//this is so any other script can access the crossfading methods
+	//without having to "find" this gameobject
 	public static MusicManager Instance;
 
+	//you might have more "fadeTimes" for unique musical transitions
 	public float fadeTime = 1f;
 
-	public int currentSceneIndex;
-
+	//this is a reference to the audio source that is currently playing a song
 	public AudioSource currentMusicSource;
+
+	//global crossfades
+	public AudioMixerSnapshot gameOverSnapshot;
 	
 	
 	void Awake() {
@@ -28,7 +37,7 @@ public class MusicManager : MonoBehaviour {
 		else {
 			Destroy(gameObject);
 		}
-		
+		//this preserves the object and it's children (the music players)
 		DontDestroyOnLoad(gameObject);
 	}
 	
@@ -36,12 +45,10 @@ public class MusicManager : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		
-		
-		
-		 
-		//initialize the audio source
+		//initialize the array of audio sources
 		musicSources = new AudioSource[musicClips.Length];
-
+		
+		//here we make an audio source for each music clip
 		for (int i = 0; i < musicClips.Length; i++) {
 			//make a new game object, make it a child of this game object
 			GameObject musicPlayer = new GameObject();
@@ -62,7 +69,6 @@ public class MusicManager : MonoBehaviour {
 		currentMusicSource = musicSources[0];
 		currentMusicSource.Play();
 
-
 	}
 	
 
@@ -82,29 +88,41 @@ public class MusicManager : MonoBehaviour {
 			
 			currentMusicSource.Stop();
 			SceneManager.LoadScene(0);
+			//
+			musicSources[0].Stop();
+			musicSources[0].volume = 1.0f;
+			//
 			musicSources[0].Play();
 			currentMusicSource = musicSources[0];
+			
+			gameOverSnapshot.TransitionTo(fadeTime);
 		}
 		
 	}
 
-
+	
+	//Here we are just calling our tweening functions
 	public void FadeOut(AudioSource source, float t) {
 		//just doing linear FadeOut for now - see Jack's easing curves, or DoTween, for other fading curves
-
-		source.DOFade(0f, t);
-
-
+		source.DOFade(0f, t).SetEase(Ease.OutCirc);
 	}
 
 	public void FadeIn(AudioSource source, float t) {
-		source.DOFade(1f, t);
+		source.DOFade(1f, t).SetEase(Ease.InCirc);
 	}
+
+	public void Crossfade(AudioSource sourceIn, AudioSource sourceOut) {
+		
+	}
+	
+	
 
 	public void PlaySong(int clipIndex) {
 		musicSources[clipIndex].Play();
 	}
+	
 
+	
 	public void GoToFirstLevel() {
 		//when we go to the first level, we want to fade out the currently playing music, then play the 
 		//level 1 music
@@ -114,7 +132,7 @@ public class MusicManager : MonoBehaviour {
 		//make sure the music source is stopped
 		musicSources[1].Stop();
 		musicSources[1].volume = 1.0f;
-		musicSources[1].PlayDelayed(fadeTime);
+		musicSources[1].PlayDelayed(fadeTime + 2.0f);
 		currentMusicSource = musicSources[1];
 
 	}
@@ -125,12 +143,14 @@ public class MusicManager : MonoBehaviour {
 		if (!musicSources[2].isPlaying) {
 			musicSources[2].Play();
 		}
+		//Fade in the item shop music while i'm fading out the other audio
 		FadeIn(musicSources[2], fadeTime);
 		currentMusicSource = musicSources[2];
 		SceneManager.LoadScene(2);
 	}
 
 	public void ExitItemShop() {
+		//basically the reverse of GoToItemShop
 		FadeOut(currentMusicSource, fadeTime);
 		FadeIn(musicSources[1], fadeTime);
 		if (!musicSources[1].isPlaying) {
